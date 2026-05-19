@@ -10,7 +10,6 @@
   "files": [
     "bin",
     "dist",
-    "templates",
     "README.md",
     "ARCHITECTURE.md",
     "LICENSE"
@@ -19,6 +18,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
     "demo:optal": "tsx src/cli/index.ts scan --root /Users/matteobusnelli/Development/optal-health-mvp --json"
   },
   "keywords": [
