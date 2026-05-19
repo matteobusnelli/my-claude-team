@@ -2,86 +2,94 @@
 /**
  * Postinstall bootstrap.
  *
- * When a user runs `npm install --save-dev github:matteobusnelli/my-claude-team`
- * (or any other install path), this script writes exactly two files into the
- * consumer's project so they can immediately invoke `/create-my-claude-team-member`
- * in Claude Code:
+ * Static-template approach — no dependency on `dist/`, no scanning, no
+ * imports. Just copies two bundled template files into the consumer's
+ * `.claude/`. This means the bootstrap works even if `prepare` was
+ * disabled, dist/ failed to build, or anything else exotic happened.
  *
- *   - .claude/commands/create-my-claude-team-member.md  (the bootstrap slash command)
- *   - .claude/settings.local.json                        (permissions tuned to the stack)
+ * Failure modes that this script CANNOT work around:
+ *   - `npm config get ignore-scripts` is true → npm refuses to run any
+ *     install scripts at all, including this one. Nothing the package
+ *     can do; only the user can re-enable scripts.
  *
- * It is intentionally silent on failure — npm install must never fail because
- * of this script. It is also non-destructive — existing files are left alone.
- *
- * We detect "consumer project" vs "the package's own dev tree" via INIT_CWD.
- * `npm` always sets INIT_CWD to the directory the user ran `npm install` from.
+ * We always print a one-line outcome so users can tell whether postinstall
+ * actually ran.
  */
 
-import { existsSync } from 'node:fs';
+import {
+  existsSync,
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+} from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, '..');
+const initCwd = process.env.INIT_CWD;
 
-async function main() {
-  const initCwd = process.env.INIT_CWD;
+const log = (msg) => console.log(`\x1b[35m▸ my-claude-team\x1b[0m ${msg}`);
 
-  // Skip when the package is being installed in its own dev tree.
-  if (!initCwd || initCwd === pkgRoot) return;
+// Skip in the package's own dev tree.
+if (!initCwd) {
+  log('skipped (no INIT_CWD — this is normal for direct dev installs).');
+  process.exit(0);
+}
+if (initCwd === pkgRoot) {
+  process.exit(0); // silent — we're being installed in our own tree
+}
+if (!existsSync(join(initCwd, 'package.json'))) {
+  log(`skipped (no package.json at INIT_CWD=${initCwd}).`);
+  process.exit(0);
+}
 
-  // Only operate on JS projects (look for package.json at INIT_CWD).
-  if (!existsSync(join(initCwd, 'package.json'))) return;
+const templates = [
+  {
+    src: join(pkgRoot, 'templates/create-my-claude-team-member.md'),
+    dst: join(initCwd, '.claude/commands/create-my-claude-team-member.md'),
+    label: '/create-my-claude-team-member',
+    overwrite: true, // framework-owned: always update
+  },
+  {
+    src: join(pkgRoot, 'templates/settings.local.json'),
+    dst: join(initCwd, '.claude/settings.local.json'),
+    label: 'settings.local.json',
+    overwrite: false, // user may have customized
+  },
+];
 
-  // Lazy-load the compiled API from this package's dist/. If dist/ isn't
-  // there yet (e.g. an exotic install path that skipped `prepare`), bail.
-  let detectProfile, generateCommand, generateSettings, writeFileSafe, DEFAULT_CONFIG;
-  try {
-    ({ detectProfile } = await import(join(pkgRoot, 'dist/intelligence/index.js')));
-    ({ generateCommand } = await import(join(pkgRoot, 'dist/generators/commands/index.js')));
-    ({ generateSettings } = await import(join(pkgRoot, 'dist/generators/settings.js')));
-    ({ writeFileSafe } = await import(join(pkgRoot, 'dist/lib/fs.js')));
-    ({ DEFAULT_CONFIG } = await import(join(pkgRoot, 'dist/types/config.js')));
-  } catch {
-    return;
+const actions = [];
+for (const t of templates) {
+  if (!existsSync(t.src)) {
+    actions.push(`! missing template ${t.src.replace(pkgRoot + '/', '')}`);
+    continue;
   }
-
-  let createdAny = false;
-
-  try {
-    const profile = await detectProfile(initCwd);
-    const ctx = { profile, config: DEFAULT_CONFIG, target: initCwd };
-
-    const cmdPath = join(initCwd, '.claude/commands/create-my-claude-team-member.md');
-    const settingsPath = join(initCwd, '.claude/settings.local.json');
-
-    // Overwrite the slash command on every install — it's framework-owned
-    // and users get bug fixes / improved prompts on reinstall.
-    const r1 = await writeFileSafe(
-      cmdPath,
-      generateCommand('create-my-claude-team-member', ctx),
-      'overwrite'
-    );
-    // Preserve existing settings — users may have added their own permission
-    // patterns that we shouldn't blow away.
-    const r2 = await writeFileSafe(
-      settingsPath,
-      generateSettings(ctx),
-      'skip-if-exists'
-    );
-
-    if (r1.action !== 'unchanged' || r2.action === 'created') createdAny = true;
-  } catch {
-    return;
-  }
-
-  if (createdAny) {
-    console.log('');
-    console.log('\x1b[1m\x1b[35m▸ my-claude-team\x1b[0m bootstrapped this repo.');
-    console.log('  Open Claude Code and run \x1b[36m/create-my-claude-team-member\x1b[0m');
-    console.log('  to scan the codebase and generate the full setup.');
-    console.log('');
+  mkdirSync(dirname(t.dst), { recursive: true });
+  if (existsSync(t.dst)) {
+    if (!t.overwrite) {
+      actions.push(`· skipped ${t.label} (already exists)`);
+      continue;
+    }
+    // Skip if content matches (avoid noise on no-op installs).
+    try {
+      const current = readFileSync(t.dst, 'utf-8');
+      const incoming = readFileSync(t.src, 'utf-8');
+      if (current === incoming) {
+        actions.push(`= unchanged ${t.label}`);
+        continue;
+      }
+    } catch {
+      // fall through to overwrite
+    }
+    copyFileSync(t.src, t.dst);
+    actions.push(`~ updated ${t.label}`);
+  } else {
+    copyFileSync(t.src, t.dst);
+    actions.push(`+ created ${t.label}`);
   }
 }
 
-await main();
+log(`bootstrapped this repo at ${initCwd}:`);
+for (const a of actions) console.log(`    ${a}`);
+console.log(`    next: open Claude Code and run \x1b[36m/create-my-claude-team-member\x1b[0m`);
