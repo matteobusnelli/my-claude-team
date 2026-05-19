@@ -1,0 +1,46 @@
+{
+  "name": "my-claude-team",
+  "version": "0.1.0",
+  "description": "A context intelligence engine for Claude Code. Generates a project-specific .claude/ setup — agents, skills, commands, rules — by deeply scanning any repository.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "my-claude-team": "./bin/my-claude-team.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "README.md",
+    "ARCHITECTURE.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "demo:optal": "tsx src/cli/index.ts scan --root /Users/matteobusnelli/Development/optal-health-mvp --json"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "ai",
+    "agents",
+    "skills",
+    "developer-experience",
+    "scaffolding"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "picocolors": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}
