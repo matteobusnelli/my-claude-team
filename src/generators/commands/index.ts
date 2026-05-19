@@ -54,9 +54,9 @@ function createMemberCmd(ctx: GenerationContext): CommandSpec {
     allowedTools: 'Bash(npx my-claude-team:*), Bash(my-claude-team:*), Bash(cat:*), Bash(ls:*), Read, Edit, Write, Grep, Glob',
     body: `# /create-my-claude-team-member
 
-Set up (or refresh) the AI team for this codebase. This is the primary
-entry point — run this once after \`npx my-claude-team init\`, and again
-later whenever the stack changes or you want a custom specialist.
+Set up (or refresh) the AI team for this codebase. This is the only
+entry point — run this once right after installing \`my-claude-team\`,
+and again later whenever the stack changes or you want a custom specialist.
 
 \`$ARGUMENTS\` (optional): a description of a *new specialist* to add on
 top of the standard team. If empty, this command sets up (first run) or

@@ -10,33 +10,32 @@ names, real entity nouns.
 
 ---
 
-## Setup (two terminal commands, then Claude does the rest)
+## Two steps
+
+### 1. Install in your repo
 
 ```bash
 npm install --save-dev github:matteobusnelli/my-claude-team
-npx my-claude-team init
 ```
 
-That's all in the terminal. `init` only drops a bootstrap slash command
-and a permissions file. Then:
+Install completes; the package automatically drops a single slash command
+(`/create-my-claude-team-member`) and a permissions file into `.claude/`.
+Nothing else is touched.
+
+### 2. Open Claude Code and run
 
 ```text
-Open Claude Code → /create-my-claude-team-member
+/create-my-claude-team-member
 ```
 
-Claude scans the codebase, reads a few representative files, asks at most
-two questions about your domain, and writes the full setup tailored to
-what it found. The generator handles the deterministic 80% (frameworks,
-paths, conventions); Claude adds the judgmental 20% (domain narrative,
-custom rules, agent ownership statements that cite real files).
-
-What gets written:
+Claude scans the codebase, samples representative source files, asks at
+most two questions about your domain, and writes the full setup tailored
+to what it found:
 
 - `CLAUDE.md` — authoritative repo guide.
 - `.claude/agents/` — specialist subagents tuned to your stack.
 - `.claude/skills/` — workflows for features, bugs, reviews, security.
 - `.claude/commands/` — slash commands.
-- `.claude/settings.local.json` — permission allowlist tuned to your tools.
 - `my-claude-team.config.ts` — user-editable overrides that survive regeneration.
 
 Re-running `/create-my-claude-team-member` later refreshes the setup when
