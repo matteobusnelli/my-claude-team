@@ -14,11 +14,13 @@ const srcEntry = resolve(here, '../src/cli/index.ts');
 if (existsSync(distEntry)) {
   await import(pathToFileURL(distEntry).href);
 } else if (existsSync(srcEntry)) {
-  // Dev fallback: run with tsx
+  // Dev fallback: run with tsx. On Windows, npx is `npx.cmd` and spawn
+  // can't find it without going through a shell. shell:true is safe here
+  // because we control the argv (no user input flows through the shell).
   const child = spawn(
     'npx',
     ['--yes', 'tsx', srcEntry, ...process.argv.slice(2)],
-    { stdio: 'inherit' }
+    { stdio: 'inherit', shell: process.platform === 'win32' }
   );
   child.on('exit', (code) => process.exit(code ?? 0));
 } else {

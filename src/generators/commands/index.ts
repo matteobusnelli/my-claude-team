@@ -74,11 +74,12 @@ directory.
 ### 1. Scan
 
 \`\`\`bash
-npx my-claude-team scan --json > /tmp/mct-profile.json
-cat /tmp/mct-profile.json
+npx my-claude-team scan --json
 \`\`\`
 
-Read the JSON. This is the deterministic baseline.
+Read the JSON the command prints. This is the deterministic baseline:
+package manager, monorepo shape, frameworks, ORM, auth, payments, CI,
+deployment, and compliance signals.
 
 ### 2. Sample the codebase
 

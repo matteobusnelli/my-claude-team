@@ -5,7 +5,7 @@ import { detectProfile } from '../intelligence/index.js';
 import { generateCommand } from '../generators/commands/index.js';
 import { generateSettings } from '../generators/settings.js';
 import { DEFAULT_CONFIG } from '../types/config.js';
-import { writeFileSafe } from '../lib/fs.js';
+import { writeFileSafe, rel } from '../lib/fs.js';
 import { log } from '../lib/log.js';
 import type { CliOpts } from './scan.js';
 
@@ -65,7 +65,7 @@ export async function runInit(opts: CliOpts): Promise<void> {
       result.action === 'created' ? pc.green('+') :
       result.action === 'overwritten' ? pc.yellow('~') :
       pc.dim('·');
-    log.raw(`  ${sym} ${pc.dim(`[${result.action}]`)} ${result.path.replace(opts.root + '/', '')}`);
+    log.raw(`  ${sym} ${pc.dim(`[${result.action}]`)} ${rel(opts.root, result.path)}`);
   }
 
   log.raw('');

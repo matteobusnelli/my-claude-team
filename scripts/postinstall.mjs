@@ -22,7 +22,7 @@ import {
   mkdirSync,
   readFileSync,
 } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +36,9 @@ if (!initCwd) {
   log('skipped (no INIT_CWD — this is normal for direct dev installs).');
   process.exit(0);
 }
-if (initCwd === pkgRoot) {
+// Compare directories via path.relative so backslash-vs-forward-slash and
+// trailing-separator differences (common on Windows) don't trip us up.
+if (relative(resolve(initCwd), pkgRoot) === '') {
   process.exit(0); // silent — we're being installed in our own tree
 }
 if (!existsSync(join(initCwd, 'package.json'))) {

@@ -4,6 +4,7 @@ import { detectProfile } from '../intelligence/index.js';
 import { generateAll } from '../generators/index.js';
 import { DEFAULT_CONFIG, type MyClaudeTeamConfig } from '../types/config.js';
 import { log } from '../lib/log.js';
+import { rel } from '../lib/fs.js';
 import { printProfile, type CliOpts } from './scan.js';
 
 /**
@@ -51,7 +52,7 @@ export async function runInitFull(opts: CliOpts): Promise<void> {
     if (r.action === 'created') created++;
     else if (r.action === 'overwritten') overwritten++;
     else if (r.action === 'skipped') skipped++;
-    log.raw(`  ${sym} ${pc.dim(`[${r.action}]`)} ${r.path.replace(opts.root + '/', '')}`);
+    log.raw(`  ${sym} ${pc.dim(`[${r.action}]`)} ${rel(opts.root, r.path)}`);
   }
 
   log.raw('');

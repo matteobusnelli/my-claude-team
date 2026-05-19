@@ -3,6 +3,7 @@ import { detectProfile } from '../intelligence/index.js';
 import { generateAll, type GenerateOptions } from '../generators/index.js';
 import { DEFAULT_CONFIG } from '../types/config.js';
 import { log } from '../lib/log.js';
+import { rel } from '../lib/fs.js';
 import type { CliOpts } from './scan.js';
 
 const VALID_TARGETS = ['all', 'claude-md', 'index-md', 'agents', 'skills', 'commands', 'settings', 'config'] as const;
@@ -36,7 +37,7 @@ export async function runGenerate(opts: CliOpts): Promise<void> {
   if (opts.dryRun) {
     log.step(`Plan (dry-run): ${report.plans.length} files`);
     for (const p of report.plans) {
-      log.raw(`  ${pc.cyan('+')} ${p.path.replace(opts.root + '/', '')} ${pc.dim(`(${p.group}, ${p.content.length}B)`)}`);
+      log.raw(`  ${pc.cyan('+')} ${rel(opts.root, p.path)} ${pc.dim(`(${p.group}, ${p.content.length}B)`)}`);
     }
     return;
   }
@@ -47,7 +48,7 @@ export async function runGenerate(opts: CliOpts): Promise<void> {
       r.action === 'overwritten' ? pc.yellow('~') :
       r.action === 'skipped' ? pc.dim('·') :
       pc.dim('=');
-    log.raw(`  ${sym} ${pc.dim(`[${r.action}]`)} ${r.path.replace(opts.root + '/', '')}`);
+    log.raw(`  ${sym} ${pc.dim(`[${r.action}]`)} ${rel(opts.root, r.path)}`);
   }
   log.ok(`Generated ${target}.`);
 }

@@ -81,9 +81,12 @@ async function main(): Promise<void> {
     const { fileURLToPath } = await import('node:url');
     const { dirname, resolve } = await import('node:path');
     const here = dirname(fileURLToPath(import.meta.url));
-    // Walk up to find package.json (works for both dist/ and src/).
+    // Walk up to find package.json. Use parent-equality to detect the root,
+    // which works on every OS — on POSIX root is `/`, on Windows it's `C:\`,
+    // and in both cases `resolve(root, '..') === root`.
     let dir = here;
-    while (dir !== '/') {
+    let prev = '';
+    while (dir !== prev) {
       try {
         const raw = await readFile(resolve(dir, 'package.json'), 'utf-8');
         const pkg = JSON.parse(raw) as { name: string; version: string };
@@ -94,6 +97,7 @@ async function main(): Promise<void> {
       } catch {
         // continue
       }
+      prev = dir;
       dir = resolve(dir, '..');
     }
     console.log('unknown');
