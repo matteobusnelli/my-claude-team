@@ -55,18 +55,22 @@ async function main() {
     const cmdPath = join(initCwd, '.claude/commands/create-my-claude-team-member.md');
     const settingsPath = join(initCwd, '.claude/settings.local.json');
 
+    // Overwrite the slash command on every install — it's framework-owned
+    // and users get bug fixes / improved prompts on reinstall.
     const r1 = await writeFileSafe(
       cmdPath,
       generateCommand('create-my-claude-team-member', ctx),
-      'skip-if-exists'
+      'overwrite'
     );
+    // Preserve existing settings — users may have added their own permission
+    // patterns that we shouldn't blow away.
     const r2 = await writeFileSafe(
       settingsPath,
       generateSettings(ctx),
       'skip-if-exists'
     );
 
-    if (r1.action === 'created' || r2.action === 'created') createdAny = true;
+    if (r1.action !== 'unchanged' || r2.action === 'created') createdAny = true;
   } catch {
     return;
   }
