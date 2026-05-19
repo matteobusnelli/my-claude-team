@@ -1,4 +1,4 @@
-import { intro, outro, text, confirm, isCancel, spinner } from '@clack/prompts';
+import { intro, outro, spinner, text, confirm, isCancel } from '@clack/prompts';
 import pc from 'picocolors';
 import { detectProfile } from '../intelligence/index.js';
 import { generateAll } from '../generators/index.js';
@@ -7,11 +7,17 @@ import { log } from '../lib/log.js';
 import { printProfile, type CliOpts } from './scan.js';
 
 /**
- * `init` is the first-run flow. It detects the stack, lets the user override
- * the project name + description, asks whether to overwrite existing setup,
- * then runs the full generator and prints a summary.
+ * `init` is the first-run flow. By default it is fully non-interactive:
+ * scan the repo, use detected defaults, write only files that don't yet
+ * exist. This is what most users want — install, run, done.
+ *
+ * `--interactive` brings back the project-name / description / overwrite
+ * prompts for users who want fine control. `--force` always overwrites.
  */
 export async function runInit(opts: CliOpts): Promise<void> {
+  const interactive = opts.positional.includes('--interactive') ||
+    opts.positional.includes('-i');
+
   intro(pc.bgMagenta(pc.black(' my-claude-team ')) + ' ' + pc.dim('init'));
 
   // ---- Detect ----
@@ -25,46 +31,51 @@ export async function runInit(opts: CliOpts): Promise<void> {
   log.raw('');
 
   // ---- Gather config ----
-  const projectName = await text({
-    message: 'Project name (used in CLAUDE.md heading):',
-    initialValue: profile.name,
-    validate: (v) => (v.trim() ? undefined : 'Required.'),
-  });
-  if (isCancel(projectName)) {
-    outro(pc.dim('Aborted.'));
-    process.exit(0);
-  }
-
-  const projectDescription = await text({
-    message: 'One-sentence description of what this project is (or leave blank):',
-    placeholder: 'A customer portal for ...',
-    initialValue: '',
-  });
-  if (isCancel(projectDescription)) {
-    outro(pc.dim('Aborted.'));
-    process.exit(0);
-  }
-
   const config: MyClaudeTeamConfig = {
     ...DEFAULT_CONFIG,
-    projectName: String(projectName),
-    ...(typeof projectDescription === 'string' && projectDescription.trim()
-      ? { projectDescription: String(projectDescription).trim() }
-      : {}),
+    projectName: profile.name,
   };
 
-  // ---- Decide on overwrite ----
-  let mode: 'create' | 'overwrite' | 'skip-if-exists' = opts.force ? 'overwrite' : 'skip-if-exists';
-  if (!opts.force) {
-    const ow = await confirm({
-      message: 'Overwrite existing files in .claude/ if present? (No = skip existing, only create missing.)',
-      initialValue: false,
+  let mode: 'create' | 'overwrite' | 'skip-if-exists' = opts.force
+    ? 'overwrite'
+    : 'skip-if-exists';
+
+  if (interactive) {
+    const name = await text({
+      message: 'Project name (used in CLAUDE.md heading):',
+      initialValue: profile.name,
+      validate: (v) => (v.trim() ? undefined : 'Required.'),
     });
-    if (isCancel(ow)) {
+    if (isCancel(name)) {
       outro(pc.dim('Aborted.'));
       process.exit(0);
     }
-    if (ow) mode = 'overwrite';
+    config.projectName = String(name);
+
+    const desc = await text({
+      message: 'One-sentence description (or leave blank):',
+      placeholder: 'A customer portal for ...',
+      initialValue: '',
+    });
+    if (isCancel(desc)) {
+      outro(pc.dim('Aborted.'));
+      process.exit(0);
+    }
+    if (typeof desc === 'string' && desc.trim()) {
+      config.projectDescription = String(desc).trim();
+    }
+
+    if (!opts.force) {
+      const ow = await confirm({
+        message: 'Overwrite existing files in .claude/ if present?',
+        initialValue: false,
+      });
+      if (isCancel(ow)) {
+        outro(pc.dim('Aborted.'));
+        process.exit(0);
+      }
+      if (ow) mode = 'overwrite';
+    }
   }
 
   // ---- Generate ----
@@ -78,6 +89,7 @@ export async function runInit(opts: CliOpts): Promise<void> {
 
   // ---- Summary ----
   log.raw('');
+  let created = 0, skipped = 0, overwritten = 0;
   for (const r of report.results) {
     const sym =
       r.action === 'created' ? pc.green('+') :
@@ -85,16 +97,25 @@ export async function runInit(opts: CliOpts): Promise<void> {
       r.action === 'skipped' ? pc.dim('·') :
       r.action === 'unchanged' ? pc.dim('=') :
       pc.cyan('m');
+    if (r.action === 'created') created++;
+    else if (r.action === 'skipped') skipped++;
+    else if (r.action === 'overwritten') overwritten++;
     log.raw(`  ${sym} ${pc.dim(`[${r.action}]`)} ${r.path.replace(opts.root + '/', '')}`);
   }
   if (opts.dryRun) {
     log.raw('');
     log.dim(`  ${report.plans.length} files would be written (dry-run, no changes made).`);
+  } else {
+    log.raw('');
+    log.dim(`  ${created} created, ${overwritten} overwritten, ${skipped} skipped.`);
+    if (skipped > 0 && !opts.force) {
+      log.dim(`  Skipped files already exist. Pass --force to overwrite.`);
+    }
   }
 
   outro(
     opts.dryRun
       ? pc.dim('Dry run complete. Re-run without --dry-run to write files.')
-      : pc.green('Done. ') + pc.dim(`Open CLAUDE.md and .claude/ to review.`)
+      : pc.green('Done. ') + pc.dim('Open CLAUDE.md and .claude/ to review.')
   );
 }
