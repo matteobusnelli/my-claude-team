@@ -10,15 +10,23 @@ exactly what it found. No `<your-framework>` placeholders. The output cites
 real file paths, real script names, real entity nouns.
 
 ```bash
+npm install --save-dev github:matteobusnelli/my-claude-team
 npx my-claude-team init
 ```
 
-That single command:
+The two-step form is recommended because the generated slash commands
+(e.g. `/create-my-claude-team-member`) shell out to `npx my-claude-team …`
+and need the package present in your `node_modules` to work.
+
+`init` does this:
 
 1. Scans the repo (frameworks, ORM, auth, storage, payments, CI, deployment, compliance).
 2. Asks for a project name + description.
 3. Generates `CLAUDE.md`, `.claude/INDEX.md`, agents tailored to the stack, skills tailored to the workflows, slash commands, and a permission allowlist.
 4. Drops a `my-claude-team.config.ts` you can edit for things that survive regeneration.
+
+> Not yet published to npm — install directly from GitHub as shown.
+> The first run takes ~30s while npm clones and builds the package; subsequent runs are cached.
 
 The flagship slash command is:
 
@@ -48,14 +56,33 @@ A great Claude Code setup needs three things that don't exist in a template:
 
 ---
 
-## Quick start
+## Install
+
+**Recommended — as a project devDependency.** Generated slash commands shell
+out to `npx my-claude-team …`, so having the package in `node_modules` lets
+those work without further setup:
 
 ```bash
-# From inside any repo
+npm install --save-dev github:matteobusnelli/my-claude-team
 npx my-claude-team init
 ```
 
-Other commands:
+**Globally.** If you want the CLI on `$PATH` across every repo:
+
+```bash
+npm install -g github:matteobusnelli/my-claude-team
+my-claude-team init
+```
+
+**One-shot, no install.** Try it without touching `package.json`. The
+generated slash commands will then need you to install the package
+properly before they can be invoked:
+
+```bash
+npx github:matteobusnelli/my-claude-team init
+```
+
+Other commands (any install path):
 
 ```bash
 my-claude-team scan              # detect-only, prints what was found
