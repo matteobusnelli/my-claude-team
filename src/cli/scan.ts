@@ -7,6 +7,8 @@ export interface CliOpts {
   force: boolean;
   dryRun: boolean;
   json: boolean;
+  full?: boolean;
+  interactive?: boolean;
   positional: string[];
 }
 

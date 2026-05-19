@@ -1,25 +1,36 @@
 # my-claude-team
 
 > A context-intelligence engine for [Claude Code](https://claude.com/claude-code).
-> Scans your repository and generates a project-specific `.claude/` setup —
-> agents, skills, slash commands, P0 rules — calibrated to your actual stack.
+> Lets Claude scan your repository and craft a project-specific `.claude/`
+> setup — agents, skills, slash commands, P0 rules — calibrated to your
+> actual stack.
 
 No template placeholders. The output cites real file paths, real script
 names, real entity nouns.
 
 ---
 
-## Install
+## Setup (two terminal commands, then Claude does the rest)
 
 ```bash
 npm install --save-dev github:matteobusnelli/my-claude-team
 npx my-claude-team init
 ```
 
-That's it. The scan + full generation runs non-interactively.
+That's all in the terminal. `init` only drops a bootstrap slash command
+and a permissions file. Then:
 
-The CLI detects frameworks, ORM, auth, payments, CI, deployment, and
-compliance signals — then writes:
+```text
+Open Claude Code → /create-my-claude-team-member
+```
+
+Claude scans the codebase, reads a few representative files, asks at most
+two questions about your domain, and writes the full setup tailored to
+what it found. The generator handles the deterministic 80% (frameworks,
+paths, conventions); Claude adds the judgmental 20% (domain narrative,
+custom rules, agent ownership statements that cite real files).
+
+What gets written:
 
 - `CLAUDE.md` — authoritative repo guide.
 - `.claude/agents/` — specialist subagents tuned to your stack.
@@ -28,22 +39,26 @@ compliance signals — then writes:
 - `.claude/settings.local.json` — permission allowlist tuned to your tools.
 - `my-claude-team.config.ts` — user-editable overrides that survive regeneration.
 
-Re-running `init` is safe — existing files are skipped. Pass `--force` to
-overwrite, or `--interactive` (or `-i`) to get prompted for project name
-and description.
+Re-running `/create-my-claude-team-member` later refreshes the setup when
+the stack changes, or adds a custom specialist:
+
+```text
+/create-my-claude-team-member analytics tracker
+```
 
 ---
 
-## Refresh or extend
+## Non-LLM mode (CI, automation)
 
-Inside Claude Code, after setup:
+If you don't want a Claude Code session in the loop — e.g. running in CI:
 
-```text
-/create-my-claude-team-member
+```bash
+npx my-claude-team init --full
 ```
 
-This slash command refreshes the setup when your stack changes, or
-generates a custom specialist the framework didn't ship with.
+Generates the same files, all deterministic, no Claude. Faster, less
+polished — the auto-generated text won't have your domain narrative,
+but the structure is identical.
 
 ---
 

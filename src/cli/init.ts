@@ -1,121 +1,85 @@
-import { intro, outro, spinner, text, confirm, isCancel } from '@clack/prompts';
+import { intro, outro, spinner } from '@clack/prompts';
 import pc from 'picocolors';
+import { join } from 'node:path';
 import { detectProfile } from '../intelligence/index.js';
-import { generateAll } from '../generators/index.js';
-import { DEFAULT_CONFIG, type MyClaudeTeamConfig } from '../types/config.js';
+import { generateCommand } from '../generators/commands/index.js';
+import { generateSettings } from '../generators/settings.js';
+import { DEFAULT_CONFIG } from '../types/config.js';
+import { writeFileSafe } from '../lib/fs.js';
 import { log } from '../lib/log.js';
-import { printProfile, type CliOpts } from './scan.js';
+import type { CliOpts } from './scan.js';
 
 /**
- * `init` is the first-run flow. By default it is fully non-interactive:
- * scan the repo, use detected defaults, write only files that don't yet
- * exist. This is what most users want — install, run, done.
+ * `init` bootstraps the conversation door, not the setup itself.
+ * It writes exactly two files:
+ *   1. `.claude/commands/create-my-claude-team-member.md` — the slash
+ *      command Claude runs to actually do the scan + generation.
+ *   2. `.claude/settings.local.json` — permissions calibrated to the
+ *      detected stack, so the slash command can invoke its tools without
+ *      prompting the user for each one.
  *
- * `--interactive` brings back the project-name / description / overwrite
- * prompts for users who want fine control. `--force` always overwrites.
+ * Everything else — CLAUDE.md, agents, skills, the rest of the commands —
+ * is written by Claude when the user runs `/create-my-claude-team-member`
+ * in a Claude Code session. Claude does the scanning *with judgment*:
+ * sampling representative files, asking about domain vocabulary, and
+ * calibrating P0 rules to the project's real constraints.
+ *
+ * `--full` runs the old behavior: generate everything deterministically
+ * via the CLI, no LLM in the loop. Useful for CI or quick previews.
  */
 export async function runInit(opts: CliOpts): Promise<void> {
-  const interactive = opts.positional.includes('--interactive') ||
-    opts.positional.includes('-i');
+  if (opts.full) {
+    const { runInitFull } = await import('./init-full.js');
+    await runInitFull(opts);
+    return;
+  }
 
   intro(pc.bgMagenta(pc.black(' my-claude-team ')) + ' ' + pc.dim('init'));
 
-  // ---- Detect ----
   const s = spinner();
-  s.start('Scanning repository');
+  s.start('Scanning repository (so permissions match your stack)');
   const profile = await detectProfile(opts.root);
   s.stop(`Scanned ${pc.bold(profile.name)}`);
 
+  const ctx = { profile, config: DEFAULT_CONFIG, target: opts.root };
+
+  const writes = [
+    {
+      path: join(opts.root, '.claude', 'commands', 'create-my-claude-team-member.md'),
+      content: generateCommand('create-my-claude-team-member', ctx),
+    },
+    {
+      path: join(opts.root, '.claude', 'settings.local.json'),
+      content: generateSettings(ctx),
+    },
+  ];
+
   log.raw('');
-  printProfile(profile);
-  log.raw('');
-
-  // ---- Gather config ----
-  const config: MyClaudeTeamConfig = {
-    ...DEFAULT_CONFIG,
-    projectName: profile.name,
-  };
-
-  let mode: 'create' | 'overwrite' | 'skip-if-exists' = opts.force
-    ? 'overwrite'
-    : 'skip-if-exists';
-
-  if (interactive) {
-    const name = await text({
-      message: 'Project name (used in CLAUDE.md heading):',
-      initialValue: profile.name,
-      validate: (v) => (v.trim() ? undefined : 'Required.'),
-    });
-    if (isCancel(name)) {
-      outro(pc.dim('Aborted.'));
-      process.exit(0);
-    }
-    config.projectName = String(name);
-
-    const desc = await text({
-      message: 'One-sentence description (or leave blank):',
-      placeholder: 'A customer portal for ...',
-      initialValue: '',
-    });
-    if (isCancel(desc)) {
-      outro(pc.dim('Aborted.'));
-      process.exit(0);
-    }
-    if (typeof desc === 'string' && desc.trim()) {
-      config.projectDescription = String(desc).trim();
-    }
-
-    if (!opts.force) {
-      const ow = await confirm({
-        message: 'Overwrite existing files in .claude/ if present?',
-        initialValue: false,
-      });
-      if (isCancel(ow)) {
-        outro(pc.dim('Aborted.'));
-        process.exit(0);
-      }
-      if (ow) mode = 'overwrite';
-    }
-  }
-
-  // ---- Generate ----
-  const s2 = spinner();
-  s2.start('Generating .claude/ setup');
-  const report = await generateAll(
-    { profile, config, target: opts.root },
-    { target: 'all', mode, dryRun: opts.dryRun }
-  );
-  s2.stop(opts.dryRun ? 'Plan ready (dry-run)' : 'Generated');
-
-  // ---- Summary ----
-  log.raw('');
-  let created = 0, skipped = 0, overwritten = 0;
-  for (const r of report.results) {
+  for (const w of writes) {
+    const result = await writeFileSafe(
+      w.path,
+      w.content,
+      opts.force ? 'overwrite' : 'skip-if-exists'
+    );
     const sym =
-      r.action === 'created' ? pc.green('+') :
-      r.action === 'overwritten' ? pc.yellow('~') :
-      r.action === 'skipped' ? pc.dim('·') :
-      r.action === 'unchanged' ? pc.dim('=') :
-      pc.cyan('m');
-    if (r.action === 'created') created++;
-    else if (r.action === 'skipped') skipped++;
-    else if (r.action === 'overwritten') overwritten++;
-    log.raw(`  ${sym} ${pc.dim(`[${r.action}]`)} ${r.path.replace(opts.root + '/', '')}`);
-  }
-  if (opts.dryRun) {
-    log.raw('');
-    log.dim(`  ${report.plans.length} files would be written (dry-run, no changes made).`);
-  } else {
-    log.raw('');
-    log.dim(`  ${created} created, ${overwritten} overwritten, ${skipped} skipped.`);
-    if (skipped > 0 && !opts.force) {
-      log.dim(`  Skipped files already exist. Pass --force to overwrite.`);
-    }
+      result.action === 'created' ? pc.green('+') :
+      result.action === 'overwritten' ? pc.yellow('~') :
+      pc.dim('·');
+    log.raw(`  ${sym} ${pc.dim(`[${result.action}]`)} ${result.path.replace(opts.root + '/', '')}`);
   }
 
-  outro(
-    opts.dryRun
-      ? pc.dim('Dry run complete. Re-run without --dry-run to write files.')
-      : pc.green('Done. ') + pc.dim('Open CLAUDE.md and .claude/ to review.')
-  );
+  log.raw('');
+  log.raw(pc.bold('Next step:'));
+  log.raw('');
+  log.raw(`  Open Claude Code in this repo and run:`);
+  log.raw('');
+  log.raw(pc.cyan('    /create-my-claude-team-member'));
+  log.raw('');
+  log.raw(pc.dim('  Claude will scan the codebase, ask a couple of questions about your'));
+  log.raw(pc.dim('  domain, then generate CLAUDE.md + every agent/skill/command tailored'));
+  log.raw(pc.dim('  to what it found.'));
+  log.raw('');
+  log.dim('  (For a fully non-LLM generation — useful for CI — run `npx my-claude-team init --full`.)');
+
+  outro(pc.green('Ready. ') + pc.dim('Continue inside Claude Code.'));
 }

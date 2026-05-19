@@ -113,6 +113,8 @@ async function main(): Promise<void> {
     force: Boolean(flags.force),
     dryRun: Boolean(flags.dryRun),
     json: Boolean(flags.json),
+    full: Boolean(flags.full),
+    interactive: Boolean(flags.interactive || flags.i),
     positional,
   };
 
