@@ -51,7 +51,12 @@ function createMemberCmd(ctx: GenerationContext): CommandSpec {
   const p = ctx.profile;
   return {
     description: 'Set up (or refresh) the full .claude/ AI team for this repository. Claude scans the codebase, asks a couple of questions, and tailors every file to what it finds.',
-    allowedTools: 'Bash(npx my-claude-team:*), Bash(my-claude-team:*), Bash(cat:*), Bash(ls:*), Read, Edit, Write, Grep, Glob',
+    // Broad allow-list so the bootstrap runs end-to-end without permission
+    // prompts. Read/Edit/Write/Grep/Glob without arg patterns means "any
+    // path"; Bash without a pattern means "any command". This is a one-shot
+    // setup command — keeping it interruption-free matters more than the
+    // marginal safety of per-command prompts.
+    allowedTools: 'Read, Write, Edit, Grep, Glob, Bash',
     body: `# /create-my-claude-team-member
 
 Set up (or refresh) the AI team for this codebase. This is the only
